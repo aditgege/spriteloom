@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SpriteLoom — spritesheet studio for AI pixel art</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Silkscreen:wght@400;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/layout.css" />
+    <link rel="stylesheet" href="styles/views.css" />
+  </head>
+  <body>
+    <header id="topbar">
+      <div id="brand">SPRITE<span class="amber">LOOM</span></div>
+      <nav id="stepper">
+        <button class="step on" data-mode="snap">
+          <span class="n">01</span>SNAP
+        </button>
+        <button class="step" data-mode="frames">
+          <span class="n">02</span>FRAMES
+        </button>
+        <button class="step" data-mode="sheet">
+          <span class="n">03</span>SHEET
+        </button>
+        <button class="step" data-mode="align">
+          <span class="n">04</span>ALIGN
+        </button>
+      </nav>
+      <span id="frameCountChip" style="display: none">0 FRAMES</span>
+      <div class="spacer"></div>
+      <button class="btn sm ghost" id="topSave" title="Save project JSON">
+        <i data-lucide="save"></i>Save
+      </button>
+      <button class="btn sm ghost" id="topLoad" title="Load project JSON">
+        <i data-lucide="folder-open"></i>Load
+      </button>
+      <button class="btn primary sm" id="topExport" disabled>
+        <i data-lucide="download"></i>Export PNG
+      </button>
+    </header>
+
+    <main id="main">
+      <aside id="rail">
+        <div id="railHead">
+          <span class="k">SOURCES</span
+          ><span class="mono" id="railCount">0</span>
+        </div>
+        <div id="railList"></div>
+        <button class="btn sm" id="railAdd">
+          <i data-lucide="image-plus"></i>Add images
+        </button>
+      </aside>
+
+      <section id="workspace">
+        <!-- empty state -->
+        <div id="dropHero">
+          <div class="hero-copy">
+            <div class="k amber-k">PIXEL-ART PIPELINE</div>
+            <h1>AI sprites in.<br />Clean spritesheets out.</h1>
+            <p>
+              SpriteLoom recovers the true pixel grid from noisy generated art,
+              lets you curate the frames that matter, and rebuilds them into one
+              anchored, runtime-ready sheet.
+            </p>
+            <ol class="steps">
+              <li>
+                <b>01 · SNAP</b
+                ><span
+                  >Recover the pixel grid — k-means palette, edge gradients,
+                  snapped cuts.</span
+                >
+              </li>
+              <li>
+                <b>02 · FRAMES</b
+                ><span
+                  >Auto-slice, grid or marquee — curate, crop and reorder.</span
+                >
+              </li>
+              <li>
+                <b>03 · SHEET</b
+                ><span
+                  >Anchor every sprite, check alignment at runtime, export PNG +
+                  atlas.</span
+                >
+              </li>
+            </ol>
+            <div class="hero-cta">
+              <button class="btn primary" id="heroUpload">
+                <i data-lucide="upload"></i>Upload images
+              </button>
+              <button class="btn" id="heroDemo">
+                <i data-lucide="sparkles"></i>Try the demo batch
+              </button>
+            </div>
+            <div class="hero-drag">
+              …or drag &amp; drop / paste images anywhere
+            </div>
+          </div>
+          <div class="hero-spec">
+            <div class="spec-frame">
+              <canvas id="heroCanvas" width="224" height="224"></canvas>
+            </div>
+            <div class="spec-cap">
+              RUNTIME CHECK · BOTTOM-CENTER ANCHOR · 4 FRAMES
+            </div>
+          </div>
+        </div>
+
+        <!-- 01 SNAP -->
+        <div id="snapView" class="ws-view" style="display: none">
+          <div class="ws-bar">
+            <span class="k">01 · SNAP</span>
+            <span class="bar-read" id="snapBarRead">—</span>
+            <span class="bar-hint">drag the divider · double-click flips</span>
+          </div>
+          <div class="ws-scroll" id="splitStage">
+            <div class="ws-center">
+              <div id="splitBox">
+                <canvas id="rawCanvas"></canvas>
+                <canvas id="snapCanvas"></canvas>
+                <canvas id="snapGrid"></canvas>
+                <div id="splitHandle">
+                  <span class="knob"
+                    ><i data-lucide="chevrons-left-right"></i
+                  ></span>
+                </div>
+                <span class="stag tag-l">SOURCE</span>
+                <span class="stag tag-r"
+                  >SNAPPED · <b id="snapTagDims"></b
+                ></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 02 FRAMES -->
+        <div id="framesView" class="ws-view" style="display: none">
+          <div class="ws-bar">
+            <span class="k">02 · EXTRACT FRAMES</span>
+            <span class="bar-read" id="framesBarRead">—</span>
+            <span class="bar-hint" id="framesHint"
+              >click a region to add it</span
+            >
+            <div class="seg zoomseg" id="framesZoomSeg">
+              <button data-z="0" class="on">FIT</button
+              ><button data-z="1">1×</button> <button data-z="2">2×</button
+              ><button data-z="4">4×</button><button data-z="8">8×</button>
+            </div>
+          </div>
+          <div class="ws-scroll" id="framesScroll">
+            <div class="ws-center">
+              <div class="canvas-wrap checker" id="framesWrap">
+                <canvas id="framesCanvas"></canvas>
+                <canvas id="framesOverlay"></canvas>
+                <div id="marqueeAdd" class="float-add" style="display: none">
+                  <button class="btn primary sm" id="maBtn">
+                    <i data-lucide="plus"></i><span id="maSize">Add</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 03 SHEET -->
+        <div id="sheetView" class="ws-view" style="display: none">
+          <div class="ws-bar">
+            <span class="k">03 · SHEET</span>
+            <span class="bar-read" id="sheetBarRead">—</span>
+            <span class="bar-hint">click a cell to select its frame</span>
+            <div class="seg zoomseg" id="sheetZoomSeg">
+              <button data-z="0" class="on">FIT</button
+              ><button data-z="1">1×</button> <button data-z="2">2×</button
+              ><button data-z="4">4×</button><button data-z="8">8×</button>
+            </div>
+          </div>
+          <div id="sheetEmptyMsg" style="display: none">
+            <div class="sempty-in">
+              <div class="k">NO FRAMES YET</div>
+              <p>
+                Extract frames from your sources first — auto-slice usually does
+                it in one click once the grid is snapped.
+              </p>
+              <button class="btn primary" id="emptyGoFrames">
+                Go to frame extraction<i data-lucide="arrow-right"></i>
+              </button>
+            </div>
+          </div>
+          <div id="sheetBody" style="display: none">
+            <div class="ws-scroll" id="sheetScroll">
+              <div class="ws-center">
+                <div class="canvas-wrap checker" id="sheetWrap">
+                  <canvas id="sheetCanvas"></canvas>
+                  <canvas id="sheetOverlay"></canvas>
+                </div>
+              </div>
+            </div>
+            <aside id="playerPanel">
+              <div class="pp-head">
+                <span class="k">RUNTIME CHECK</span
+                ><span class="mono" id="ppIdx">0/0</span>
+              </div>
+              <div class="pp-stage">
+                <canvas id="playerCanvas" width="200" height="130"></canvas>
+              </div>
+              <div class="pp-ctl">
+                <button class="iconbtn" id="ppPrev" aria-label="Previous frame">
+                  <i data-lucide="chevron-left"></i>
+                </button>
+                <button class="iconbtn" id="ppPlay" aria-label="Play / pause">
+                  <i data-lucide="play" class="ic-play"></i
+                  ><i data-lucide="pause" class="ic-pause"></i>
+                </button>
+                <button class="iconbtn" id="ppNext" aria-label="Next frame">
+                  <i data-lucide="chevron-right"></i>
+                </button>
+                <button
+                  class="iconbtn on"
+                  id="ppOnion"
+                  aria-label="Onion skin"
+                  title="Onion skin"
+                >
+                  <i data-lucide="ghost"></i>
+                </button>
+                <div class="pp-fps">
+                  <span>FPS</span
+                  ><input
+                    type="range"
+                    id="ppFps"
+                    min="1"
+                    max="24"
+                    value="8"
+                  /><b class="mono" id="ppFpsV">8</b>
+                </div>
+              </div>
+              <p class="pp-note">
+                Every frame is pinned to the marker by its pivot. A ghosted
+                double image means that frame's pivot needs adjusting — select
+                it in the sheet, then click the preview on the right.
+              </p>
+            </aside>
+          </div>
+        </div>
+
+        <!-- 04 ALIGN -->
+        <div id="alignView" class="ws-view" style="display: none">
+          <div class="ws-bar">
+            <span class="k">04 · ALIGN</span>
+            <span class="bar-read" id="alignBarRead">—</span>
+            <div class="seg" id="alignModeSeg">
+              <button data-v="stack" class="on">Stack</button
+              ><button data-v="play">Play</button>
+            </div>
+            <div class="seg zoomseg" id="alignZoomSeg">
+              <button data-z="0" class="on">FIT</button
+              ><button data-z="2">2×</button><button data-z="4">4×</button
+              ><button data-z="8">8×</button>
+            </div>
+          </div>
+          <div id="alignBody">
+            <div class="ws-scroll" id="alignScroll">
+              <div class="ws-center">
+                <div class="canvas-wrap checker" id="alignWrap">
+                  <canvas id="alignCanvas"></canvas>
+                </div>
+              </div>
+            </div>
+            <div id="alignCtl">
+              <button class="iconbtn" id="alPrev" aria-label="Previous frame">
+                <i data-lucide="chevron-left"></i>
+              </button>
+              <button class="iconbtn" id="alPlay" aria-label="Play / pause">
+                <i data-lucide="play" class="ic-play"></i
+                ><i data-lucide="pause" class="ic-pause"></i>
+              </button>
+              <button class="iconbtn" id="alNext" aria-label="Next frame">
+                <i data-lucide="chevron-right"></i>
+              </button>
+              <button class="iconbtn on" id="alOnion" aria-label="Onion skin" title="Onion skin">
+                <i data-lucide="ghost"></i>
+              </button>
+              <span class="mono" id="alIdx">0/0</span>
+              <div class="pp-fps">
+                <span>FPS</span
+                ><input type="range" id="alFps" min="1" max="24" value="8"
+                /><b class="mono" id="alFpsV">8</b>
+              </div>
+              <span class="bar-hint">arrows nudge active · shift ×5</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside id="inspector">
+        <!-- 01 SNAP -->
+        <div class="sec" data-m="snap">
+          <div class="k">GRID DETECTION</div>
+          <div class="read-box" id="snapRead">—</div>
+          <div class="seg" id="snapModeSeg">
+            <button data-v="auto" class="on">Auto</button
+            ><button data-v="manual">Manual</button>
+          </div>
+          <div id="snapWarn" class="warnnote" style="display: none">
+            No repeating grid found — output is a quantized pass-through. Try
+            Manual pitch, or raise the palette size.
+          </div>
+          <div class="chiprow" id="chipRowX">
+            <span class="clab">X PITCH</span
+            ><span class="chips" id="pitchCandsX"></span>
+          </div>
+          <div class="chiprow" id="chipRowY">
+            <span class="clab">Y PITCH</span
+            ><span class="chips" id="pitchCandsY"></span>
+          </div>
+          <div id="snapManual" style="display: none" class="fields2">
+            <label class="field"
+              ><span class="flabel">Pitch X (px)</span
+              ><input type="number" id="mPitchX" min="1" max="512" value="8"
+            /></label>
+            <label class="field"
+              ><span class="flabel">Pitch Y (px)</span
+              ><input type="number" id="mPitchY" min="1" max="512" value="8"
+            /></label>
+            <label class="field"
+              ><span class="flabel">Offset X</span
+              ><input type="number" id="mOffX" min="0" max="511" value="0"
+            /></label>
+            <label class="field"
+              ><span class="flabel">Offset Y</span
+              ><input type="number" id="mOffY" min="0" max="511" value="0"
+            /></label>
+          </div>
+          <label class="check"
+            ><input type="checkbox" id="snapEdges" checked /> Snap cuts to edge
+            peaks</label
+          >
+        </div>
+        <div class="sec" data-m="snap">
+          <div class="k">PALETTE (K-MEANS)</div>
+          <label class="field"
+            ><span class="flabel">COLORS <b class="mono" id="kVal">12</b></span>
+            <input type="range" id="kRange" min="2" max="24" value="12"
+          /></label>
+          <div class="swatches" id="palSwatches"></div>
+          <label class="field"
+            ><span class="flabel">CUSTOM PALETTE (hex, comma-sep)</span
+            ><input
+              type="text"
+              id="paletteHex"
+              placeholder="0d2b45,ffecd6,…"
+              spellcheck="false"
+          /></label>
+          <div class="row">
+            <button class="btn sm" id="paletteApply">Apply</button>
+            <button class="btn sm ghost" id="paletteClear">Clear</button>
+          </div>
+          <label class="check"
+            ><input type="checkbox" id="ditherToggle" /> Dither resample
+            (center)</label
+          >
+          <button class="btn sm" id="pixelLockBtn">
+            <i data-lucide="lock"></i>Lock pixel size
+          </button>
+        </div>
+        <div class="sec" data-m="snap">
+          <button class="btn ghost sm" id="skipSnapBtn">
+            <i data-lucide="skip-forward"></i>Skip snap — use original
+          </button>
+          <button class="btn primary" id="toFramesBtn">
+            Extract frames<i data-lucide="arrow-right"></i>
+          </button>
+          <div class="hint">
+            The amber grid on the snapped side shows where every cut lands —
+            that's the algorithm, made visible. Drag the divider to compare.
+          </div>
+        </div>
+        <!-- 02 FRAMES -->
+        <div class="sec" data-m="frames">
+          <div class="k">EXTRACTION</div>
+          <div class="seg" id="frameModeSeg">
+            <button data-v="auto" class="on">Auto-slice</button>
+            <button data-v="grid">Grid</button>
+            <button data-v="marquee">Marquee</button>
+          </div>
+          <div id="fmAuto">
+            <div class="hint" id="autoRead">—</div>
+            <button class="btn primary" id="autoAddBtn">
+              <i data-lucide="plus"></i>Add frames
+            </button>
+          </div>
+          <div id="fmGrid" style="display: none">
+            <div class="fields2">
+              <label class="field"
+                ><span class="flabel">Columns</span
+                ><input type="number" id="gridCols" min="1" max="64" value="4"
+              /></label>
+              <label class="field"
+                ><span class="flabel">Rows</span
+                ><input type="number" id="gridRows" min="1" max="64" value="4"
+              /></label>
+            </div>
+            <button class="btn primary" id="gridAddBtn">
+              <i data-lucide="grid-3x3"></i
+              ><span id="gridAddLbl">Slice 4×4 grid</span>
+            </button>
+          </div>
+          <div id="fmMarq" style="display: none">
+            <div class="hint">
+              Drag on the canvas to crop a frame — it snaps to the recovered
+              pixel grid — then press <b>Enter</b> or the floating button. Frame
+              backgrounds are removed by flood-fill from the edges, so enclosed
+              colors survive.
+            </div>
+            <button class="btn primary" id="marqAddBtn" disabled>
+              <i data-lucide="plus"></i>Add selection
+            </button>
+          </div>
+        </div>
+        <div class="sec" data-m="frames">
+          <div class="k">CURATED FRAMES</div>
+          <div class="hint" id="curRead">
+            No frames yet. Extract some above.
+          </div>
+          <button class="btn primary" id="toSheetBtn" disabled>
+            Arrange sheet<i data-lucide="arrow-right"></i>
+          </button>
+          <button class="btn sm" id="batchSnapBtn">
+            <i data-lucide="layers"></i>Re-snap all sources
+          </button>
+        </div>
+        <!-- 03 SHEET -->
+        <div class="sec" data-m="sheet">
+          <div class="k">LAYOUT</div>
+          <div class="fields2">
+            <label class="field"
+              ><span class="flabel">Columns</span
+              ><input type="number" id="sheetCols" min="1" max="64" value="4"
+            /></label>
+            <label class="field"
+              ><span class="flabel">Rows</span
+              ><input type="text" id="rowsRead" value="2 (auto)" readonly
+            /></label>
+          </div>
+          <div class="seg" id="cellSeg">
+            <button data-v="auto" class="on">Auto cell</button
+            ><button data-v="manual">Manual cell</button>
+          </div>
+          <div class="fields2" id="cellDims" style="display: none">
+            <label class="field"
+              ><span class="flabel">Cell W</span
+              ><input type="number" id="cellW" min="1" max="512" value="16"
+            /></label>
+            <label class="field"
+              ><span class="flabel">Cell H</span
+              ><input type="number" id="cellH" min="1" max="512" value="16"
+            /></label>
+          </div>
+          <div class="fields2">
+            <label class="field"
+              ><span class="flabel">Spacing</span
+              ><input
+                type="number"
+                id="sheetSpacing"
+                min="0"
+                max="64"
+                value="0"
+            /></label>
+            <label class="field"
+              ><span class="flabel">Margin</span
+              ><input type="number" id="sheetMargin" min="0" max="64" value="0"
+            /></label>
+          </div>
+          <div class="seg" id="scaleSeg">
+            <button data-s="1" class="on">1×</button
+            ><button data-s="2">2×</button> <button data-s="4">4×</button
+            ><button data-s="8">8×</button>
+          </div>
+          <div class="read-box" id="sheetRead">—</div>
+          <div class="seg" id="presetSeg">
+            <button data-p="16px-4x4">16px·4×4</button
+            ><button data-p="32px-8x4">32px·8×4</button
+            ><button data-p="64px-4x2">64px·4×2</button>
+          </div>
+          <div class="seg" id="packerSeg">
+            <button data-packer="grid" class="on">Grid</button
+            ><button data-packer="maxrects">MaxRects</button>
+          </div>
+          <label class="check"
+            ><input type="checkbox" id="bleedToggle" /> 1px bleed extrude</label
+          >
+          <div class="warnnote" id="sheetWarn" style="display: none"></div>
+        </div>
+        <div class="sec" data-m="sheet align">
+          <div class="k">ANCHORING</div>
+          <div class="anchor-row">
+            <div class="anchor-grid" id="anchorGrid">
+              <button
+                data-a="tl"
+                style="--dx: 6px; --dy: 4px"
+                aria-label="Top left"
+              ></button>
+              <button
+                data-a="tc"
+                style="--dx: 12px; --dy: 4px"
+                aria-label="Top center"
+              ></button>
+              <button
+                data-a="tr"
+                style="--dx: 19px; --dy: 4px"
+                aria-label="Top right"
+              ></button>
+              <button
+                data-a="ml"
+                style="--dx: 6px; --dy: 10px"
+                aria-label="Middle left"
+              ></button>
+              <button
+                data-a="mc"
+                style="--dx: 12px; --dy: 10px"
+                aria-label="Center"
+              ></button>
+              <button
+                data-a="mr"
+                style="--dx: 19px; --dy: 10px"
+                aria-label="Middle right"
+              ></button>
+              <button
+                data-a="bl"
+                style="--dx: 6px; --dy: 16px"
+                aria-label="Bottom left"
+              ></button>
+              <button
+                data-a="bc"
+                style="--dx: 12px; --dy: 16px"
+                aria-label="Bottom center"
+              ></button>
+              <button
+                data-a="br"
+                style="--dx: 19px; --dy: 16px"
+                aria-label="Bottom right"
+              ></button>
+            </div>
+            <div class="anchor-side">
+              <div class="alab" id="anchorLabel">BOTTOM CENTER</div>
+              <label class="check"
+                ><input type="checkbox" id="trimToggle" checked /> Trim to
+                content</label
+              >
+              <div class="hint">
+                Trim aligns by visible content, not the canvas box — feet land
+                on the same line even when frames differ in size.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="sec" data-m="sheet align" id="frameSec" style="display: none">
+          <div class="k">FRAME · <span id="fsName"></span></div>
+          <label class="field"
+            ><span class="flabel">Frame name (file name)</span
+            ><input type="text" id="fsNameInput" maxlength="64" spellcheck="false"
+          /></label>
+          <div class="fa-wrap">
+            <canvas id="faCanvas" width="246" height="148"></canvas>
+          </div>
+          <div class="fa-read" id="faRead">—</div>
+          <div class="fields2">
+            <label class="field"
+              ><span class="flabel">Duration (ms)</span
+              ><input type="number" id="fdMs" min="10" max="5000" step="5" value="125"
+            /></label>
+            <label class="field"
+              ><span class="flabel">&nbsp;</span>
+              <button class="btn sm ghost" id="fdAll" title="Apply this duration to all frames">All ←</button>
+            </label>
+          </div>
+          <div class="seg" id="fdPreset">
+            <button data-ms="50">50</button
+            ><button data-ms="80">80</button
+            ><button data-ms="125" class="on">125</button
+            ><button data-ms="250">250</button
+            ><button data-ms="500">500</button>
+          </div>
+          <div class="row">
+            <button class="btn sm" id="faReset">
+              <i data-lucide="crosshair"></i>Match sheet anchor
+            </button>
+            <div class="fzctl">
+              <button class="iconbtn" id="fzMinus" aria-label="Scale down">
+                <i data-lucide="minus"></i>
+              </button>
+              <span class="mono" id="fzRead">×1</span>
+              <button class="iconbtn" id="fzPlus" aria-label="Scale up">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+          </div>
+          <button class="btn primary sm" id="fsExport">
+            <i data-lucide="download"></i>Export <span id="fsExportLabel">frame</span>.png
+          </button>
+          <div class="k">POSITION (match anchor)</div>
+          <div class="fields2">
+            <label class="field"
+              ><span class="flabel">Offset X</span
+              ><input type="number" id="fxOff" min="-64" max="64" step="1" value="0"
+            /></label>
+            <label class="field"
+              ><span class="flabel">Offset Y</span
+              ><input type="number" id="fyOff" min="-64" max="64" step="1" value="0"
+            /></label>
+          </div>
+          <div class="row">
+            <button class="iconbtn" id="fxLeft" aria-label="Nudge left">◀</button>
+            <button class="iconbtn" id="fxRight" aria-label="Nudge right">▶</button>
+            <button class="iconbtn" id="fyUp" aria-label="Nudge up">▲</button>
+            <button class="iconbtn" id="fyDown" aria-label="Nudge down">▼</button>
+            <button class="btn sm ghost" id="fxReset">Reset 0·0</button>
+          </div>
+          <div class="hint">
+            Click the preview to set this frame's pivot. Nudge or type offset to
+            match the anchor — amber cross is always on top. Per-frame integer scale
+            compensates sources snapped at different pixel pitches.
+          </div>
+        </div>
+        <div class="sec" data-m="sheet align" id="stackSec">
+          <div class="k">STACK · <span id="stackCount">0</span></div>
+          <div class="fa-wrap">
+            <canvas id="stackCanvas" width="246" height="148"></canvas>
+          </div>
+          <div class="fa-read" id="stackRead">—</div>
+          <div id="stackList"></div>
+          <div class="row">
+            <button class="iconbtn" id="stackUp" aria-label="Move active up" title="Move active up">
+              <i data-lucide="chevron-up"></i>
+            </button>
+            <button class="iconbtn" id="stackDown" aria-label="Move active down" title="Move active down">
+              <i data-lucide="chevron-down"></i>
+            </button>
+            <button class="btn sm ghost" id="stackTop">Top</button>
+            <button class="btn sm ghost" id="stackSolo">Solo</button>
+            <button class="btn sm ghost" id="stackShowAll">All</button>
+          </div>
+          <label class="field"
+            ><span class="flabel">GHOST <b class="mono" id="stackGhostV">45%</b></span>
+            <input type="range" id="stackGhost" min="5" max="90" value="45"
+          /></label>
+          <label class="check"
+            ><input type="checkbox" id="stackTint" checked /> Tint ghosts per frame</label
+          >
+          <div class="hint">
+            All frames stacked on the sheet anchor — active opaque on top, the rest
+            tinted ghosts. Click a row to make it active, nudge it in FRAME panel.
+          </div>
+        </div>
+        <div class="sec" data-m="sheet align" id="clipSec">
+          <div class="k">CLIP · <span id="clipTotal">—</span></div>
+          <div class="seg" id="clipPresetSeg">
+            <button data-clip="breathe">Breathe</button
+            ><button data-clip="blink">Blink</button
+            ><button data-clip="walk">Walk</button
+            ><button data-clip="run">Run</button
+            ><button data-clip="attack">Attack</button
+            ><button data-clip="hit">Hit</button>
+          </div>
+          <div class="fa-read" id="clipRead">—</div>
+          <div class="hint">
+            Tray order IS the clip — presets stamp ms across the tray (loop/trim).
+          </div>
+        </div>
+        <div class="sec" data-m="sheet">
+          <div class="k">EXPORT</div>
+          <div class="seg" id="bgSeg">
+            <button data-v="transparent" class="on">Transparent</button
+            ><button data-v="solid">Solid</button>
+          </div>
+          <label class="field" id="bgColorField" style="display: none">
+            <span class="flabel">Background</span
+            ><input type="color" id="bgColor" value="#1b1917"
+          /></label>
+
+          <button class="btn primary" id="exportPng" disabled>
+            <i data-lucide="download"></i>Export PNG
+          </button>
+          <button class="btn" id="exportJson" disabled>
+            <i data-lucide="braces"></i>Export JSON atlas
+          </button>
+          <button class="btn" id="exportZip">
+            <i data-lucide="download"></i>Download ZIP (frames)
+          </button>
+        </div>
+      </aside>
+    </main>
+
+    <footer id="tray">
+      <div id="trayHead">
+        <span class="k">FRAME TRAY</span>
+        <span class="mono" id="trayCount">0 FRAMES</span>
+        <span class="tray-hints"
+          >drag to reorder · Del removes · Ctrl+Z undo</span
+        >
+        <button class="btn sm ghost" id="trayUndo">
+          <i data-lucide="undo-2"></i>Undo
+        </button>
+        <button class="btn sm ghost" id="trayClear">
+          <i data-lucide="trash-2"></i>Clear
+        </button>
+        <span style="flex:1"></span>
+        <button class="btn sm ghost" id="trayDupSel" title="Duplicate selected">
+          <i data-lucide="copy"></i>Dup sel
+        </button>
+        <button class="btn sm ghost" id="trayDelSel" title="Delete selected">
+          <i data-lucide="trash"></i>Del sel
+        </button>
+        <button class="btn sm ghost" id="trayRename" title="Bulk rename">
+          <i data-lucide="type"></i>Rename
+        </button>
+      </div>
+      <div id="trayList">
+        <div id="trayEmpty">
+          Frames you extract appear here — drag to reorder, they fill the sheet
+          left to right.
+        </div>
+      </div>
+    </footer>
+
+    <div id="toasts"></div>
+    <div id="dropVeil"><div class="dv-in">DROP IMAGES TO ADD SOURCES</div></div>
+    <div id="tinyScreen">
+      SpriteLoom is built for a desktop-sized window — please widen your
+      browser.
+    </div>
+    <input type="file" id="fileInput" multiple hidden accept="image/*" />
+    <input type="file" id="projectInput" hidden accept=".json,application/json" />
+
+    <script src="js/00-utils.js" defer></script>
+    <script src="js/01-state.js" defer></script>
+    <script src="js/10-kmeans.js" defer></script>
+    <script src="js/11-snap.js" defer></script>
+    <script src="js/12-sources.js" defer></script>
+    <script src="js/20-frames.js" defer></script>
+    <script src="js/30-sheet.js" defer></script>
+    <script src="js/31-stack.js" defer></script>
+    <script src="js/32-align.js" defer></script>
+    <script src="js/33-clip.js" defer></script>
+    <script src="js/40-tray.js" defer></script>
+    <script src="js/50-app.js" defer></script>
+    <script src="js/51-wiring.js" defer></script>
+    <script src="js/52-zip.js" defer></script>
+    <script src="js/53-save.js" defer></script>
+  </body>
+</html>
